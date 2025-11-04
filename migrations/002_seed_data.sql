@@ -3,7 +3,7 @@
 
 -- Inserir usuário admin (senha: admin123 - hash bcrypt)
 INSERT INTO usuarios_restaurante (nome, email, senha, tipo_usuario) VALUES
-('Admin Feijuca', 'admin@feijuca.com', '$2a$10$YIjlrPNoS0.OtIUVUVXh2eS8kLHSVeJ8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z', 'admin'),
+('Admin Feijuca', 'admin@feijuca.com', '$2a$10$yAtU8Jdi.MobcNf4XaDRuuirI8dqMoRwROi6t32PEMKCd.alJfPLe', 'admin'),
 ('João Atendente', 'joao@feijuca.com', '$2a$10$YIjlrPNoS0.OtIUVUVXh2eS8kLHSVeJ8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z', 'atendente'),
 ('Maria Cozinha', 'maria@feijuca.com', '$2a$10$YIjlrPNoS0.OtIUVUVXh2eS8kLHSVeJ8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z8Z', 'cozinha');
 

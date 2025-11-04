@@ -3,21 +3,20 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import pedidoRoutes from './routes/pedidoRoutes';
+import produtoRoutes from './routes/produtoRoutes'; // <- NOVA LINHA
 
 dotenv.config();
 
 const app: Express = express();
 
 // Middlewares
-// --- CORREÇÃO DO CORS AQUI ---
 const allowedOrigins = [
-  'http://localhost:3000', // Acesso pelo navegador
-  'http://backend:3000',   // Acesso interno do container web
+  'http://localhost:3000',
+  'http://backend:3000',
 ];
 
 app.use(cors({
-  origin: (origin, callback ) => {
-    // Permite requisições sem 'origin' (como apps mobile ou curl)
+  origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
@@ -27,7 +26,6 @@ app.use(cors({
   },
   credentials: true,
 }));
-// --- FIM DA CORREÇÃO DO CORS ---
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -40,6 +38,7 @@ app.get('/health', (req: Request, res: Response) => {
 // Rotas da API
 app.use('/api/auth', authRoutes);
 app.use('/api/pedidos', pedidoRoutes);
+app.use('/api/produtos', produtoRoutes); // <- NOVA LINHA
 
 // Tratamento de rotas não encontradas
 app.use((req: Request, res: Response) => {

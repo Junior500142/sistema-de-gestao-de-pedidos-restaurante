@@ -7,10 +7,19 @@ const usuarioRepository = new UsuarioRepository();
 
 export class AuthService {
   async login(email: string, senha: string): Promise<LoginResponse> {
+    console.log('🔹 Tentando login:', { email, senha }); // LOG 1
+    
     const usuario = await usuarioRepository.findByEmail(email);
+    console.log('🔹 Usuário encontrado:', usuario ? 'SIM' : 'NÃO'); // LOG 2
+    
     if (!usuario) throw new Error('Usuário não encontrado');
 
+    console.log('🔹 Comparando senhas...'); // LOG 3
+    console.log('🔹 Senha do BD (primeiros 20):', usuario.senha?.substring(0, 20)); // LOG 4
+    
     const senhaValida = await bcrypt.compare(senha, usuario.senha || '');
+    console.log('🔹 Senha válida?', senhaValida); // LOG 5
+    
     if (!senhaValida) throw new Error('Senha incorreta');
 
     const token = this.generateToken(usuario);
@@ -33,21 +42,18 @@ export class AuthService {
   }
 
   private generateToken(usuario: Usuario): string {
-  const payload: JWTPayload = {
-    id: usuario.id,
-    email: usuario.email,
-    tipo_usuario: usuario.tipo_usuario,
-  };
+    const payload: JWTPayload = {
+      id: usuario.id,
+      email: usuario.email,
+      tipo_usuario: usuario.tipo_usuario,
+    };
 
-  const secret: Secret = process.env.JWT_SECRET || 'default_secret';
+    const secret: Secret = process.env.JWT_SECRET || 'default_secret';
+    const expiresIn: jwt.SignOptions['expiresIn'] =
+      (process.env.JWT_EXPIRATION as jwt.SignOptions['expiresIn']) || '24h';
 
-  // 🔧 converte para tipo aceito explicitamente
-  const expiresIn: jwt.SignOptions['expiresIn'] =
-    (process.env.JWT_EXPIRATION as jwt.SignOptions['expiresIn']) || '24h';
+    const options: jwt.SignOptions = { expiresIn };
 
-  const options: jwt.SignOptions = { expiresIn };
-
-  return jwt.sign(payload, secret, options);
-}
-
+    return jwt.sign(payload, secret, options);
+  }
 }

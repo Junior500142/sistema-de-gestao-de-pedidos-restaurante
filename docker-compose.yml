@@ -54,7 +54,7 @@ services:
     container_name: feijuca-web
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://feijuca-backend:3001
+      NEXT_PUBLIC_API_URL: http://localhost:3001
     ports:
       - "3000:3000"
     depends_on:

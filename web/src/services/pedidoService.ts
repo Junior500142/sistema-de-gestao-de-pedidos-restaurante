@@ -7,7 +7,7 @@ export const pedidoService = {
     if (filtro?.status) params.append('status', filtro.status);
     if (filtro?.id_mesa) params.append('id_mesa', filtro.id_mesa.toString());
 
-    const response = await api.get<ApiResponse<Pedido[]>>('/pedidos', { params });
+    const response = await api.get<ApiResponse<Pedido[]>>('/api/pedidos', { params });
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.error || 'Erro ao buscar pedidos');
@@ -17,7 +17,7 @@ export const pedidoService = {
   },
 
   async getPedidoById(id: number): Promise<Pedido> {
-    const response = await api.get<ApiResponse<Pedido>>(`/pedidos/${id}`);
+    const response = await api.get<ApiResponse<Pedido>>(`/api/pedidos/${id}`);
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.error || 'Erro ao buscar pedido');
@@ -27,7 +27,7 @@ export const pedidoService = {
   },
 
   async createPedido(id_mesa: number): Promise<Pedido> {
-    const response = await api.post<ApiResponse<Pedido>>('/pedidos', {
+    const response = await api.post<ApiResponse<Pedido>>('/api/pedidos', {
       id_mesa,
     });
 
@@ -39,7 +39,7 @@ export const pedidoService = {
   },
 
   async updatePedidoStatus(id: number, status: StatusPedido): Promise<Pedido> {
-    const response = await api.patch<ApiResponse<Pedido>>(`/pedidos/${id}/status`, {
+    const response = await api.patch<ApiResponse<Pedido>>(`/api/pedidos/${id}/status`, {
       status,
     });
 
@@ -51,7 +51,7 @@ export const pedidoService = {
   },
 
   async deletePedido(id: number): Promise<void> {
-    const response = await api.delete<ApiResponse>(`/pedidos/${id}`);
+    const response = await api.delete<ApiResponse>(`/api/pedidos/${id}`);
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Erro ao deletar pedido');
@@ -65,7 +65,7 @@ export const pedidoService = {
     preco_unitario: number,
     observacoes?: string
   ): Promise<ItemPedido> {
-    const response = await api.post<ApiResponse<ItemPedido>>(`/pedidos/${id_pedido}/itens`, {
+    const response = await api.post<ApiResponse<ItemPedido>>(`/api/pedidos/${id_pedido}/itens`, {
       id_produto,
       quantidade,
       preco_unitario,
@@ -80,7 +80,7 @@ export const pedidoService = {
   },
 
   async updateItemStatus(id: number, status_cozinha: StatusCozinha): Promise<ItemPedido> {
-    const response = await api.patch<ApiResponse<ItemPedido>>(`/pedidos/itens/${id}/status`, {
+    const response = await api.patch<ApiResponse<ItemPedido>>(`/api/pedidos/itens/${id}/status`, {
       status_cozinha,
     });
 
@@ -92,7 +92,7 @@ export const pedidoService = {
   },
 
   async deleteItemPedido(id: number): Promise<void> {
-    const response = await api.delete<ApiResponse>(`/pedidos/itens/${id}`);
+    const response = await api.delete<ApiResponse>(`/api/pedidos/itens/${id}`);
 
     if (!response.data.success) {
       throw new Error(response.data.error || 'Erro ao deletar item');
