@@ -242,27 +242,71 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  const handleStatusChange = async (itemId: number, novoStatus: StatusCozinha) => {
-    try {
-      await pedidoService.updateItemStatus(itemId, novoStatus);
-      carregarPedidos();
-    } catch (error: any) {
-      setErro(error.message || 'Erro ao atualizar status');
-    }
+  // OPÇÃO 1: Visualização por Pedidos Completos
+  const obterStatusPedido = (pedido: Pedido): StatusCozinha => {
+    if (!pedido.itens || pedido.itens.length === 0) return 'recebido';
+    
+    // Se todos os itens estão entregues, pedido está entregue
+    const todosEntregues = pedido.itens.every(item => item.status_cozinha === 'entregue');
+    if (todosEntregues) return 'entregue';
+    
+    // Se todos os itens estão prontos ou entregues, pedido está pronto
+    const algunsProntos = pedido.itens.some(item => item.status_cozinha === 'pronto');
+    const todosMinimoProntos = pedido.itens.every(item => 
+      item.status_cozinha === 'pronto' || item.status_cozinha === 'entregue'
+    );
+    if (todosMinimoProntos && algunsProntos) return 'pronto';
+    
+    // Se algum item está em preparo, pedido está em preparo
+    const algunsEmPreparo = pedido.itens.some(item => item.status_cozinha === 'em_preparo');
+    if (algunsEmPreparo) return 'em_preparo';
+    
+    // Caso contrário, pedido está recebido
+    return 'recebido';
   };
 
-  const obterItensPorStatus = (status: StatusCozinha) => {
-    const itens: ItemPedido[] = [];
-    pedidos.forEach((pedido) => {
-      if (pedido.itens) {
-        pedido.itens.forEach((item) => {
-          if (item.status_cozinha === status) {
-            itens.push({ ...item, id_pedido: pedido.id });
-          }
-        });
-      }
+  const obterPedidosPorStatus = (status: StatusCozinha) => {
+    return pedidos.filter(pedido => obterStatusPedido(pedido) === status);
+  };
+
+  const obterItemMaisAntigo = (pedido: Pedido): ItemPedido | null => {
+    if (!pedido.itens || pedido.itens.length === 0) return null;
+    
+    const itensComTempo = pedido.itens.filter(item => item.iniciado_em);
+    if (itensComTempo.length === 0) return null;
+    
+    return itensComTempo.reduce((maisAntigo, item) => {
+      if (!maisAntigo.iniciado_em || !item.iniciado_em) return maisAntigo;
+      return new Date(item.iniciado_em) < new Date(maisAntigo.iniciado_em) ? item : maisAntigo;
     });
-    return itens;
+  };
+
+  const handleAvancarPedido = async (pedido: Pedido, statusAtual: StatusCozinha) => {
+    const proximoStatus: Record<StatusCozinha, StatusCozinha> = {
+      'recebido': 'em_preparo',
+      'em_preparo': 'pronto',
+      'pronto': 'entregue',
+      'entregue': 'entregue',
+    };
+
+    try {
+      const novoStatus = proximoStatus[statusAtual];
+      
+      // Atualiza todos os itens do pedido que ainda não atingiram o novo status
+      const promessas = pedido.itens
+        ?.filter(item => {
+          const statusOrdem = ['recebido', 'em_preparo', 'pronto', 'entregue'];
+          const ordemAtual = statusOrdem.indexOf(item.status_cozinha);
+          const ordemNovo = statusOrdem.indexOf(novoStatus);
+          return ordemAtual < ordemNovo;
+        })
+        .map(item => pedidoService.updateItemStatus(item.id, novoStatus)) || [];
+      
+      await Promise.all(promessas);
+      carregarPedidos();
+    } catch (error: any) {
+      setErro(error.message || 'Erro ao avançar pedido');
+    }
   };
 
   if (!montado || !usuario) {
@@ -289,7 +333,7 @@ export default function Dashboard() {
               onClick={() => setMostrarModalCardapio(true)}
               className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded transition"
             >
-             Cardápio
+              📋 Cardápio
             </button>
             <button
               onClick={handleLogout}
@@ -326,101 +370,113 @@ export default function Dashboard() {
                     {status === 'entregue' && 'Entregue'}
                   </h2>
                   <p className="text-sm opacity-90">
-                    {obterItensPorStatus(status).length} itens
+                    {obterPedidosPorStatus(status).length} pedidos
                   </p>
                 </div>
 
                 <div className="p-4 space-y-3 min-h-96 overflow-y-auto">
-                  {obterItensPorStatus(status).length === 0 ? (
-                    <p className="text-gray-400 text-center py-8">Nenhum item</p>
+                  {obterPedidosPorStatus(status).length === 0 ? (
+                    <p className="text-gray-400 text-center py-8">Nenhum pedido</p>
                   ) : (
-                    obterItensPorStatus(status).map((item) => (
-                      <div
-                        key={item.id}
-                        className="bg-gray-50 border-l-4 border-orange-500 p-4 rounded hover:shadow-md transition"
-                      >
-                        {/* Cabeçalho do Card com Temporizador */}
-                        <div className="flex justify-between items-start mb-3 pb-2 border-b border-gray-200">
-                          <div className="flex items-center">
-                            <span className="font-bold text-gray-800 text-base">
-                              Pedido #{item.id_pedido}
-                            </span>
-                            <Temporizador iniciado_em={item.iniciado_em} status={item.status_cozinha} />
+                    obterPedidosPorStatus(status).map((pedido) => {
+                      const itemMaisAntigo = obterItemMaisAntigo(pedido);
+                      
+                      return (
+                        <div
+                          key={pedido.id}
+                          className="bg-gray-50 border-l-4 border-orange-500 p-4 rounded hover:shadow-md transition"
+                        >
+                          {/* Cabeçalho do Pedido */}
+                          <div className="flex justify-between items-start mb-3 pb-3 border-b-2 border-orange-200">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl"></span>
+                              <div>
+                                <h3 className="font-bold text-gray-800 text-lg">
+                                  Pedido #{pedido.id}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  Mesa {pedido.id_mesa}
+                                </p>
+                              </div>
+                            </div>
+                            {itemMaisAntigo && (
+                              <Temporizador 
+                                iniciado_em={itemMaisAntigo.iniciado_em} 
+                                status={itemMaisAntigo.status_cozinha} 
+                              />
+                            )}
                           </div>
-                          <span className="text-xs text-gray-500">
-                            Item #{item.id}
-                          </span>
-                        </div>
 
-                        {/* Informações do Produto */}
-                        <div className="mb-3">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-bold text-gray-800 mb-1">
-                                {item.produto?.nome || 'Produto não encontrado'}
-                              </h4>
-                              <p className="text-sm text-gray-600 mb-1">
-                                Qtd: {item.quantidade} x R$ {item.preco_unitario.toFixed(2)} = 
-                                <span className="font-bold text-green-600 ml-1">
-                                  R$ {(item.quantidade * item.preco_unitario).toFixed(2)}
-                                </span>
-                              </p>
+                          {/* Lista de Itens */}
+                          <div className="mb-3 space-y-2">
+                            {pedido.itens && pedido.itens.length > 0 ? (
+                              pedido.itens.map((item, index) => (
+                                <div key={item.id} className="flex items-start gap-2 text-sm">
+                                  <span className="text-gray-400 font-mono text-xs mt-0.5">
+                                    {index + 1}.
+                                  </span>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-gray-700">
+                                        {item.quantidade}x
+                                      </span>
+                                      <span className="text-gray-800">
+                                        {item.produto?.nome || `Produto #${item.id_produto}`}
+                                      </span>
+                                    </div>
+                                    {item.observacoes && (
+                                      <p className="text-xs text-yellow-700 italic ml-6 mt-1 bg-yellow-50 px-2 py-1 rounded">
+                                         {item.observacoes}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {status !== 'entregue' && (
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={() => handleAbrirEdicaoItem(item)}
+                                        className="text-blue-500 hover:text-blue-700 text-xs"
+                                        title="Editar"
+                                      >
+                                        Editar
+                                      </button>
+                                      <button
+                                        onClick={() => handleExcluirItem(item.id)}
+                                        className="text-red-500 hover:text-red-700 text-xs"
+                                        title="Excluir"
+                                      >
+                                        Excluir
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-gray-400 text-sm italic">Nenhum item no pedido</p>
+                            )}
+                          </div>
+
+                          {/* Total do Pedido */}
+                          <div className="pt-2 border-t border-gray-200 mb-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-semibold text-gray-700">Total:</span>
+                              <span className="text-lg font-bold text-green-600">
+                                R$ {pedido.total.toFixed(2)}
+                              </span>
                             </div>
                           </div>
 
-                          {/* Observações */}
-                          {item.observacoes && (
-                            <div className="mt-2 bg-yellow-50 border-l-2 border-yellow-400 p-2 rounded">
-                              <p className="text-xs font-semibold text-yellow-800 mb-1">
-                                📝 Observações:
-                              </p>
-                              <p className="text-xs text-yellow-700">
-                                {item.observacoes}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Botões de Ação */}
-                        <div className="flex gap-2 mt-3">
+                          {/* Botão Avançar Todo Pedido */}
                           {status !== 'entregue' && (
-                            <>
-                              <button
-                                onClick={() => handleAbrirEdicaoItem(item)}
-                                className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded transition"
-                                title="Editar item"
-                              >
-                                 Editar
-                              </button>
-                              <button
-                                onClick={() => handleExcluirItem(item.id)}
-                                className="bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2 px-3 rounded transition"
-                                title="Excluir item"
-                              >
-                                 Excluir
-                              </button>
-                            </>
+                            <button
+                              onClick={() => handleAvancarPedido(pedido, status)}
+                              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold py-2 px-3 rounded transition"
+                            >
+                              Avançar →
+                            </button>
                           )}
                         </div>
-                        
-                        {status !== 'entregue' && (
-                          <button
-                            onClick={() => {
-                              const proximoStatus: Record<StatusCozinha, StatusCozinha> = {
-                                'recebido': 'em_preparo',
-                                'em_preparo': 'pronto',
-                                'pronto': 'entregue',
-                                'entregue': 'entregue',
-                              };
-                              handleStatusChange(item.id, proximoStatus[status]);
-                            }}
-                            className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-2 px-3 rounded mt-2 transition"
-                          >
-                            Avançar →
-                          </button>
-                        )}
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -509,7 +565,10 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <button
-                            onClick={() => handleRemoverDoCarrinho(item.id_produto)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoverDoCarrinho(item.id_produto);
+                            }}
                             className="text-red-500 hover:text-red-700 font-bold text-sm px-2"
                             disabled={criandoPedido}
                           >
@@ -519,7 +578,10 @@ export default function Dashboard() {
                         
                         <div className="flex items-center gap-2 mb-2">
                           <button
-                            onClick={() => handleAlterarQuantidade(item.id_produto, item.quantidade - 1)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAlterarQuantidade(item.id_produto, item.quantidade - 1);
+                            }}
                             className="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded text-sm"
                             disabled={criandoPedido}
                           >
@@ -527,7 +589,10 @@ export default function Dashboard() {
                           </button>
                           <span className="font-bold">{item.quantidade}</span>
                           <button
-                            onClick={() => handleAlterarQuantidade(item.id_produto, item.quantidade + 1)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAlterarQuantidade(item.id_produto, item.quantidade + 1);
+                            }}
                             className="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded text-sm"
                             disabled={criandoPedido}
                           >
@@ -540,6 +605,7 @@ export default function Dashboard() {
                           placeholder="Observações (opcional)"
                           value={item.observacoes}
                           onChange={(e) => handleAlterarObservacoes(item.id_produto, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
                           className="w-full border rounded px-2 py-1 text-sm"
                           disabled={criandoPedido}
                         />
@@ -643,7 +709,7 @@ export default function Dashboard() {
                 disabled={salvandoEdicao}
                 className="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded transition"
               >
-                {salvandoEdicao ? 'Salvando...' : '💾 Salvar'}
+                {salvandoEdicao ? 'Salvando...' : 'Salvar'}
               </button>
               <button
                 onClick={() => {

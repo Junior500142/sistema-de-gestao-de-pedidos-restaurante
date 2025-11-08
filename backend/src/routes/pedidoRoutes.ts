@@ -17,7 +17,7 @@ router.delete('/:id', (req, res) => pedidoController.deletePedido(req, res));
 
 // Rotas de itens do pedido
 router.post('/:id_pedido/itens', (req, res) => pedidoController.addItemPedido(req, res));
-router.patch('/itens/:id', (req, res) => pedidoController.updateItemPedido(req, res));
+router.patch('/itens/:id', (req, res) => pedidoController.updateItemPedido(req, res)); // NOVA ROTA
 router.patch('/itens/:id/status', (req, res) => pedidoController.updateItemStatus(req, res));
 router.delete('/itens/:id', (req, res) => pedidoController.deleteItemPedido(req, res));
 

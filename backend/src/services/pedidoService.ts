@@ -57,34 +57,6 @@ export class PedidoService {
     return pedido;
   }
 
-  async updateItemPedido(
-  id: number,
-  quantidade: number,
-  observacoes: string | undefined,
-  id_usuario: number
-): Promise<ItemPedido> {
-  const item = await this.getItemPedido(id);
-  if (!item) {
-    throw new Error('Item do pedido não encontrado');
-  }
-
-  if (quantidade < 1) {
-    throw new Error('Quantidade deve ser maior que zero');
-  }
-
-  const itemAtualizado = await pedidoRepository.updateItem(id, quantidade, observacoes);
-
-  // Registrar auditoria
-  await auditRepository.create('itens_pedido', id, 'update', id_usuario, {
-    quantidade_anterior: item.quantidade,
-    observacoes_anterior: item.observacoes,
-    quantidade_nova: quantidade,
-    observacoes_nova: observacoes,
-  });
-
-  return itemAtualizado;
-}
-
   async deletePedido(id: number, id_usuario: number): Promise<boolean> {
     const pedidoAtual = await pedidoRepository.findById(id);
     if (!pedidoAtual) {
@@ -92,11 +64,9 @@ export class PedidoService {
     }
 
     const resultado = await pedidoRepository.delete(id);
-
     if (resultado) {
       // Registrar auditoria
       await auditRepository.create('pedidos', id, 'delete', id_usuario, pedidoAtual);
-
       // Liberar a mesa
       await mesaRepository.updateStatus(pedidoAtual.id_mesa, 'livre');
     }
@@ -134,45 +104,40 @@ export class PedidoService {
   }
 
   async updateItemStatus(id: number, status_cozinha: StatusCozinha, id_usuario: number): Promise<ItemPedido> {
-    const item = await this.getItemPedido(id);
-    if (!item) {
-      throw new Error('Item do pedido não encontrado');
-    }
-
+    // Buscar o item diretamente no repository para pegar o status anterior
     const itemAtualizado = await pedidoRepository.updateItemStatus(id, status_cozinha);
 
     // Registrar auditoria
     await auditRepository.create('itens_pedido', id, 'status_change', id_usuario, {
-      status_anterior: item.status_cozinha,
       status_novo: status_cozinha,
     });
 
     return itemAtualizado;
   }
 
-  async deleteItemPedido(id: number, id_usuario: number): Promise<boolean> {
-    const item = await this.getItemPedido(id);
-    if (!item) {
-      throw new Error('Item do pedido não encontrado');
+  async updateItemPedido(
+    id: number,
+    quantidade: number,
+    observacoes?: string,
+    id_usuario?: number
+  ): Promise<ItemPedido> {
+    const item = await pedidoRepository.updateItem(id, quantidade, observacoes);
+
+    if (id_usuario) {
+      await auditRepository.create('itens_pedido', id, 'update', id_usuario);
     }
 
-    const resultado = await pedidoRepository.deleteItem(id);
+    return item;
+  }
 
+  async deleteItemPedido(id: number, id_usuario: number): Promise<boolean> {
+    const resultado = await pedidoRepository.deleteItem(id);
+    
     if (resultado) {
       // Registrar auditoria
-      await auditRepository.create('itens_pedido', id, 'delete', id_usuario, item);
+      await auditRepository.create('itens_pedido', id, 'delete', id_usuario);
     }
 
     return resultado;
-  }
-
-  private async getItemPedido(id: number): Promise<ItemPedido | null> {
-    // Buscar item em todos os pedidos
-    const pedidos = await pedidoRepository.findAll();
-    for (const pedido of pedidos) {
-      const item = (pedido as any).itens?.find((i: ItemPedido) => i.id === id);
-      if (item) return item;
-    }
-    return null;
   }
 }

@@ -50,17 +50,28 @@ export class PedidoRepository {
 
     const [pedidoRows] = await pool.query<RowDataPacket[]>(query, values);
     
-    // Para cada pedido, buscar seus itens
+    // Para cada pedido, buscar seus itens COM JOIN de produtos
     const pedidosComItens = await Promise.all(
       pedidoRows.map(async (pedidoRow) => {
         const [itensRows] = await pool.query<RowDataPacket[]>(
-          'SELECT * FROM itens_pedido WHERE id_pedido = ? ORDER BY criado_em ASC',
+          `SELECT ip.*, 
+                  p.id as produto_id, 
+                  p.nome as produto_nome, 
+                  p.descricao as produto_descricao,
+                  p.preco as produto_preco,
+                  p.disponivel as produto_disponivel,
+                  p.id_categoria as produto_id_categoria,
+                  p.criado_em as produto_criado_em
+           FROM itens_pedido ip
+           LEFT JOIN produtos p ON ip.id_produto = p.id
+           WHERE ip.id_pedido = ? 
+           ORDER BY ip.criado_em ASC`,
           [pedidoRow.id]
         );
 
         return {
           ...this.mapRow(pedidoRow),
-          itens: itensRows.map(row => this.mapItemRow(row)),
+          itens: itensRows.map(row => this.mapItemRowWithProduct(row)),
         };
       })
     );
@@ -146,51 +157,51 @@ export class PedidoRepository {
   }
 
   async updateItemStatus(id: number, status_cozinha: StatusCozinha): Promise<ItemPedido> {
-  // Se está mudando para "em_preparo" pela primeira vez, registrar o início
-  if (status_cozinha === 'em_preparo') {
-    await pool.query(
-      'UPDATE itens_pedido SET status_cozinha = ?, iniciado_em = COALESCE(iniciado_em, NOW()) WHERE id = ?',
-      [status_cozinha, id]
+    // Se está mudando para "em_preparo" pela primeira vez, registrar o início
+    if (status_cozinha === 'em_preparo') {
+      await pool.query(
+        'UPDATE itens_pedido SET status_cozinha = ?, iniciado_em = COALESCE(iniciado_em, NOW()) WHERE id = ?',
+        [status_cozinha, id]
+      );
+    } else {
+      await pool.query(
+        'UPDATE itens_pedido SET status_cozinha = ? WHERE id = ?',
+        [status_cozinha, id]
+      );
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM itens_pedido WHERE id = ?',
+      [id]
     );
-  } else {
-    await pool.query(
-      'UPDATE itens_pedido SET status_cozinha = ? WHERE id = ?',
-      [status_cozinha, id]
-    );
+
+    return this.mapItemRow(rows[0]);
   }
-
-  const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT * FROM itens_pedido WHERE id = ?',
-    [id]
-  );
-
-  return this.mapItemRow(rows[0]);
-}
 
   async updateItem(
-  id: number,
-  quantidade: number,
-  observacoes?: string
-): Promise<ItemPedido> {
-  await pool.query(
-    'UPDATE itens_pedido SET quantidade = ?, observacoes = ? WHERE id = ?',
-    [quantidade, observacoes || null, id]
-  );
+    id: number,
+    quantidade: number,
+    observacoes?: string
+  ): Promise<ItemPedido> {
+    await pool.query(
+      'UPDATE itens_pedido SET quantidade = ?, observacoes = ? WHERE id = ?',
+      [quantidade, observacoes || null, id]
+    );
 
-  const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT * FROM itens_pedido WHERE id = ?',
-    [id]
-  );
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM itens_pedido WHERE id = ?',
+      [id]
+    );
 
-  if (rows.length === 0) {
-    throw new Error('Item não encontrado após atualização');
+    if (rows.length === 0) {
+      throw new Error('Item não encontrado após atualização');
+    }
+
+    // Atualizar o total do pedido
+    await this.updateTotal(rows[0].id_pedido);
+
+    return this.mapItemRow(rows[0]);
   }
-
-  // Atualizar o total do pedido
-  await this.updateTotal(rows[0].id_pedido);
-
-  return this.mapItemRow(rows[0]);
-}
 
   async deleteItem(id: number): Promise<boolean> {
     const [itemRows] = await pool.query<RowDataPacket[]>(
@@ -224,38 +235,35 @@ export class PedidoRepository {
   }
 
   private mapItemRow(row: any): ItemPedido {
-  return {
-    id: row.id,
-    id_pedido: row.id_pedido,
-    id_produto: row.id_produto,
-    quantidade: row.quantidade,
-    preco_unitario: parseFloat(row.preco_unitario),
-    observacoes: row.observacoes,
-    status_cozinha: row.status_cozinha,
-    criado_em: new Date(row.criado_em),
-    iniciado_em: row.iniciado_em ? new Date(row.iniciado_em) : undefined, // NOVA LINHA
-  };
-}
+    return {
+      id: row.id,
+      id_pedido: row.id_pedido,
+      id_produto: row.id_produto,
+      quantidade: row.quantidade,
+      preco_unitario: parseFloat(row.preco_unitario),
+      observacoes: row.observacoes,
+      status_cozinha: row.status_cozinha,
+      criado_em: new Date(row.criado_em),
+      iniciado_em: row.iniciado_em ? new Date(row.iniciado_em) : undefined,
+    };
+  }
 
   private mapItemRowWithProduct(row: any): ItemPedido {
-  return {
-    id: row.id,
-    id_pedido: row.id_pedido,
-    id_produto: row.id_produto,
-    quantidade: row.quantidade,
-    preco_unitario: parseFloat(row.preco_unitario),
-    observacoes: row.observacoes,
-    status_cozinha: row.status_cozinha,
-    criado_em: new Date(row.criado_em),
-    produto: row.produto_id ? {
-      id: row.produto_id,
-      nome: row.produto_nome,
-      descricao: row.produto_descricao,
-      preco: parseFloat(row.produto_preco),
-      disponivel: Boolean(row.produto_disponivel),
-      id_categoria: row.produto_id_categoria,
-      criado_em: new Date(row.produto_criado_em),
-    } : undefined,
-  };
-}
+    const item = this.mapItemRow(row);
+    
+    // Se tem dados do produto, adiciona
+    if (row.produto_id) {
+      item.produto = {
+        id: row.produto_id,
+        nome: row.produto_nome,
+        descricao: row.produto_descricao,
+        preco: parseFloat(row.produto_preco),
+        disponivel: Boolean(row.produto_disponivel),
+        id_categoria: row.produto_id_categoria,
+        criado_em: new Date(row.produto_criado_em),
+      };
+    }
+    
+    return item;
+  }
 }
