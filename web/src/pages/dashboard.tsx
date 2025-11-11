@@ -475,6 +475,40 @@ export default function Dashboard() {
                             </button>
                           )}
                         </div>
+                        {status !== 'recebido' && (
+                          <button
+                            onClick={() => {
+                              const statusAnterior: Record<StatusCozinha, StatusCozinha> = {
+                                'recebido': 'recebido',
+                                'em_preparo': 'recebido',
+                                'pronto': 'em_preparo',
+                                'entregue': 'pronto',
+                              };
+                              handleStatusChange(item.id, statusAnterior[status]);
+                            }}
+                            className="w-full bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded mt-2 transition"
+                          >
+                            ← Voltar Etapa
+                          </button>
+                        )}
+                        {status !== 'entregue' && (
+                          <button
+                            onClick={() => {
+                              const proximoStatus: Record<StatusCozinha, StatusCozinha> = {
+                                'recebido': 'em_preparo',
+                                'em_preparo': 'pronto',
+                                'pronto': 'entregue',
+                                'entregue': 'entregue',
+                              };
+                              handleStatusChange(item.id, proximoStatus[status]);
+                            }}
+                            className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-2 px-3 rounded mt-2 transition"
+                          >
+                            Avançar →
+                          </button>
+                        )}
+                      </div>
+                    ))
                       );
                     })
                   )}
