@@ -242,7 +242,7 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  // OPÇÃO 1: Visualização por Pedidos Completos
+  // Visualização por Pedidos Completos
   const obterStatusPedido = (pedido: Pedido): StatusCozinha => {
     if (!pedido.itens || pedido.itens.length === 0) return 'recebido';
     
@@ -389,7 +389,7 @@ export default function Dashboard() {
                           {/* Cabeçalho do Pedido */}
                           <div className="flex justify-between items-start mb-3 pb-3 border-b-2 border-orange-200">
                             <div className="flex items-center gap-2">
-                              <span className="text-2xl"></span>
+                              <span className="text-2xl">🍽️</span>
                               <div>
                                 <h3 className="font-bold text-gray-800 text-lg">
                                   Pedido #{pedido.id}
@@ -426,7 +426,7 @@ export default function Dashboard() {
                                     </div>
                                     {item.observacoes && (
                                       <p className="text-xs text-yellow-700 italic ml-6 mt-1 bg-yellow-50 px-2 py-1 rounded">
-                                         {item.observacoes}
+                                        💬 {item.observacoes}
                                       </p>
                                     )}
                                   </div>
@@ -437,14 +437,14 @@ export default function Dashboard() {
                                         className="text-blue-500 hover:text-blue-700 text-xs"
                                         title="Editar"
                                       >
-                                        Editar
+                                        ✏️
                                       </button>
                                       <button
                                         onClick={() => handleExcluirItem(item.id)}
                                         className="text-red-500 hover:text-red-700 text-xs"
                                         title="Excluir"
                                       >
-                                        Excluir
+                                        🗑️
                                       </button>
                                     </div>
                                   )}
@@ -475,40 +475,6 @@ export default function Dashboard() {
                             </button>
                           )}
                         </div>
-                        {status !== 'recebido' && (
-                          <button
-                            onClick={() => {
-                              const statusAnterior: Record<StatusCozinha, StatusCozinha> = {
-                                'recebido': 'recebido',
-                                'em_preparo': 'recebido',
-                                'pronto': 'em_preparo',
-                                'entregue': 'pronto',
-                              };
-                              handleStatusChange(item.id, statusAnterior[status]);
-                            }}
-                            className="w-full bg-gray-500 hover:bg-gray-600 text-white text-xs font-bold py-2 px-3 rounded mt-2 transition"
-                          >
-                            ← Voltar Etapa
-                          </button>
-                        )}
-                        {status !== 'entregue' && (
-                          <button
-                            onClick={() => {
-                              const proximoStatus: Record<StatusCozinha, StatusCozinha> = {
-                                'recebido': 'em_preparo',
-                                'em_preparo': 'pronto',
-                                'pronto': 'entregue',
-                                'entregue': 'entregue',
-                              };
-                              handleStatusChange(item.id, proximoStatus[status]);
-                            }}
-                            className="w-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold py-2 px-3 rounded mt-2 transition"
-                          >
-                            Avançar →
-                          </button>
-                        )}
-                      </div>
-                    ))
                       );
                     })
                   )}
