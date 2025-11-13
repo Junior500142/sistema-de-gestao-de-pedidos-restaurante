@@ -27,7 +27,6 @@ export default function Dashboard() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
   
-  // Estados do modal de novo pedido
   const [mostrarModal, setMostrarModal] = useState(false);
   const [mesaSelecionada, setMesaSelecionada] = useState('');
   const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([]);
@@ -35,17 +34,14 @@ export default function Dashboard() {
   const [carregandoProdutos, setCarregandoProdutos] = useState(false);
   const [montado, setMontado] = useState(false);
   
-  // Estados do modal de edição de item
   const [mostrarModalEdicaoItem, setMostrarModalEdicaoItem] = useState(false);
   const [itemEditando, setItemEditando] = useState<ItemPedido | null>(null);
   const [quantidadeEdicao, setQuantidadeEdicao] = useState(1);
   const [observacoesEdicao, setObservacoesEdicao] = useState('');
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
-  // Estado do modal de cardápio
   const [mostrarModalCardapio, setMostrarModalCardapio] = useState(false);
 
-  // Evitar hydration - esperar montar no cliente
   useEffect(() => {
     setMontado(true);
   }, []);
@@ -237,31 +233,38 @@ export default function Dashboard() {
     }
   };
 
+  const handleExcluirPedido = async (pedidoId: number) => {
+    if (!confirm('Tem certeza que deseja excluir TODO o pedido? Esta ação não pode ser desfeita!')) return;
+
+    try {
+      await pedidoService.deletePedido(pedidoId);
+      carregarPedidos();
+      setErro('');
+    } catch (error: any) {
+      setErro(error.message || 'Erro ao excluir pedido');
+    }
+  };
+
   const handleLogout = () => {
     logout();
     router.push('/login');
   };
 
-  // Visualização por Pedidos Completos
   const obterStatusPedido = (pedido: Pedido): StatusCozinha => {
     if (!pedido.itens || pedido.itens.length === 0) return 'recebido';
     
-    // Se todos os itens estão entregues, pedido está entregue
     const todosEntregues = pedido.itens.every(item => item.status_cozinha === 'entregue');
     if (todosEntregues) return 'entregue';
     
-    // Se todos os itens estão prontos ou entregues, pedido está pronto
     const algunsProntos = pedido.itens.some(item => item.status_cozinha === 'pronto');
     const todosMinimoProntos = pedido.itens.every(item => 
       item.status_cozinha === 'pronto' || item.status_cozinha === 'entregue'
     );
     if (todosMinimoProntos && algunsProntos) return 'pronto';
     
-    // Se algum item está em preparo, pedido está em preparo
     const algunsEmPreparo = pedido.itens.some(item => item.status_cozinha === 'em_preparo');
     if (algunsEmPreparo) return 'em_preparo';
     
-    // Caso contrário, pedido está recebido
     return 'recebido';
   };
 
@@ -292,7 +295,6 @@ export default function Dashboard() {
     try {
       const novoStatus = proximoStatus[statusAtual];
       
-      // Atualiza todos os itens do pedido que ainda não atingiram o novo status
       const promessas = pedido.itens
         ?.filter(item => {
           const statusOrdem = ['recebido', 'em_preparo', 'pronto', 'entregue'];
@@ -309,13 +311,37 @@ export default function Dashboard() {
     }
   };
 
+  const handleVoltarPedido = async (pedido: Pedido, statusAtual: StatusCozinha) => {
+    const statusAnterior: Record<StatusCozinha, StatusCozinha | null> = {
+      'recebido': null,
+      'em_preparo': 'recebido',
+      'pronto': 'em_preparo',
+      'entregue': 'pronto',
+    };
+
+    const statusVoltar = statusAnterior[statusAtual];
+    if (!statusVoltar) {
+      setErro('Não é possível voltar mais');
+      return;
+    }
+
+    try {
+      const promessas = pedido.itens
+        ?.map(item => pedidoService.updateItemStatus(item.id, statusVoltar)) || [];
+      
+      await Promise.all(promessas);
+      carregarPedidos();
+    } catch (error: any) {
+      setErro(error.message || 'Erro ao voltar pedido');
+    }
+  };
+
   if (!montado || !usuario) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
@@ -345,7 +371,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Conteúdo */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {erro && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex justify-between items-center">
@@ -386,7 +411,6 @@ export default function Dashboard() {
                           key={pedido.id}
                           className="bg-gray-50 border-l-4 border-orange-500 p-4 rounded hover:shadow-md transition"
                         >
-                          {/* Cabeçalho do Pedido */}
                           <div className="flex justify-between items-start mb-3 pb-3 border-b-2 border-orange-200">
                             <div className="flex items-center gap-2">
                               <span className="text-2xl">🍽️</span>
@@ -407,7 +431,6 @@ export default function Dashboard() {
                             )}
                           </div>
 
-                          {/* Lista de Itens */}
                           <div className="mb-3 space-y-2">
                             {pedido.itens && pedido.itens.length > 0 ? (
                               pedido.itens.map((item, index) => (
@@ -455,7 +478,6 @@ export default function Dashboard() {
                             )}
                           </div>
 
-                          {/* Total do Pedido */}
                           <div className="pt-2 border-t border-gray-200 mb-3">
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-semibold text-gray-700">Total:</span>
@@ -465,15 +487,32 @@ export default function Dashboard() {
                             </div>
                           </div>
 
-                          {/* Botão Avançar Todo Pedido */}
-                          {status !== 'entregue' && (
-                            <button
-                              onClick={() => handleAvancarPedido(pedido, status)}
-                              className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold py-2 px-3 rounded transition"
-                            >
-                              Avançar →
-                            </button>
-                          )}
+                          <div className="flex gap-2">
+                            {status !== 'recebido' && (
+                              <button
+                                onClick={() => handleVoltarPedido(pedido, status)}
+                                className="flex-1 bg-gray-400 hover:bg-gray-500 text-white text-sm font-bold py-2 px-3 rounded transition"
+                              >
+                                ← Voltar
+                              </button>
+                            )}
+                            
+                            {status !== 'entregue' && (
+                              <button
+                                onClick={() => handleAvancarPedido(pedido, status)}
+                                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold py-2 px-3 rounded transition"
+                              >
+                                Avançar →
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => handleExcluirPedido(pedido.id)}
+                            className="w-full mt-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold py-2 px-3 rounded transition"
+                          >
+                            🗑️ Excluir Pedido
+                          </button>
                         </div>
                       );
                     })
@@ -485,7 +524,6 @@ export default function Dashboard() {
         )}
       </main>
 
-      {/* Modal Novo Pedido */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -650,7 +688,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Modal Edição de Item */}
       {mostrarModalEdicaoItem && itemEditando && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full">
@@ -675,7 +712,7 @@ export default function Dashboard() {
                   <span className="text-2xl font-bold">{quantidadeEdicao}</span>
                   <button
                     onClick={() => setQuantidadeEdicao(quantidadeEdicao + 1)}
-                    className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded font-bold"
+                    className="bg-gray-300 hover:bg-gray-400 px-4 py -2 rounded font-bold"
                     disabled={salvandoEdicao}
                   >
                     +
@@ -726,7 +763,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Modal Cardápio */}
       <ModalCardapio 
         mostrar={mostrarModalCardapio} 
         onFechar={() => setMostrarModalCardapio(false)} 
