@@ -346,7 +346,7 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-sky-50">Feijuca Gourmet</h1>
-            <p className="text-sky-50">Bem-vindo, {usuario.nome}!</p>
+            <p className="text-sky-50">Bem-vindotestestestets, {usuario.nome}!</p>
           </div>
           <div className="flex gap-3">
             <button

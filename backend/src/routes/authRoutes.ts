@@ -7,9 +7,11 @@ const authController = new AuthController();
 
 // Rotas públicas
 router.post('/login', (req, res) => authController.login(req, res));
-router.post('/register', (req, res) => authController.createUser(req, res));
+router.post('/register', (req, res) => authController.register(req, res));
 
 // Rotas protegidas (admin only)
-router.post('/users', authMiddleware, adminMiddleware, (req, res) => authController.createUser(req, res));
+router.get('/pending-users', authMiddleware, adminMiddleware, (req, res) => authController.getPendingUsers(req, res));
+router.patch('/approve-user/:id', authMiddleware, adminMiddleware, (req, res) => authController.approveUser(req, res));
+router.delete('/reject-user/:id', authMiddleware, adminMiddleware, (req, res) => authController.rejectUser(req, res));
 
 export default router;
