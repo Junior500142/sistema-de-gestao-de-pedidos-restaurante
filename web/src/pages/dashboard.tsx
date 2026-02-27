@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
   const [mostrarModalCardapio, setMostrarModalCardapio] = useState(false);
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
 
   useEffect(() => {
     setMontado(true);
@@ -81,6 +82,38 @@ export default function Dashboard() {
       setCarregando(false);
     }
   };
+
+  const handleBaixarRelatorio = async () => {
+  setGerandoRelatorio(true);
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333'}/pedidos/relatorio/exportar`, {
+      method: 'GET',
+      headers: { 
+        'Authorization': `Bearer ${localStorage.getItem('token')}` 
+      }
+    });
+
+    if (!response.ok) throw new Error('Erro ao gerar relatório');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    link.href = url;
+    link.setAttribute('download', `relatorio_vendas_${new Date().getTime()}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    // Limpeza de memória
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    setErro('Não foi possível baixar o relatório. Verifique a conexão.');
+  } finally {
+    setGerandoRelatorio(false);
+  }
+};
 
   const carregarProdutos = async () => {
     try {
@@ -354,6 +387,21 @@ export default function Dashboard() {
               className="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-4 rounded transition"
             >
               + Novo Pedido
+            </button>
+            <button 
+              onClick={handleBaixarRelatorio}
+              disabled={gerandoRelatorio}
+              className={`font-bold py-2 px-4 rounded transition flex items-center gap-2 ${
+                gerandoRelatorio 
+                  ? 'bg-slate-400 cursor-not-allowed text-slate-200' 
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              {gerandoRelatorio ? (
+                <>⏳ Processando...</>
+              ) : (
+                <>📊 Exportar Relatório</>
+              )}
             </button>
             <button
               onClick={() => setMostrarModalCardapio(true)}
