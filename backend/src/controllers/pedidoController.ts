@@ -182,42 +182,21 @@ export class PedidoController {
       const { status_cozinha } = req.body;
       const id_usuario = req.user?.id;
 
-      console.log('🔹 updateItemStatus - Dados recebidos:', { 
-        id, 
-        status_cozinha, 
-        id_usuario,
-        body: req.body 
-      });
-
-      if (!status_cozinha) {
-        console.log('❌ Status da cozinha não foi enviado');
+      if (!status_cozinha || !id_usuario) {
         return res.status(400).json({
           success: false,
-          error: 'Status da cozinha é obrigatório',
+          error: 'Status da cozinha e ID do usuário são obrigatórios',
         } as ApiResponse);
       }
 
-      if (!id_usuario) {
-        console.log('❌ ID do usuário não encontrado');
-        return res.status(400).json({
-          success: false,
-          error: 'ID do usuário é obrigatório',
-        } as ApiResponse);
-      }
-
-      console.log('🔹 Chamando pedidoService.updateItemStatus...');
       const item = await pedidoService.updateItemStatus(parseInt(id), status_cozinha, id_usuario);
-
-      console.log('✅ Item atualizado com sucesso:', item);
 
       return res.json({
         success: true,
         data: item,
       } as ApiResponse);
     } catch (error: any) {
-      console.error('❌ ERRO em updateItemStatus:');
-      console.error('❌ Mensagem:', error.message);
-      console.error('❌ Stack:', error.stack);
+      console.error('❌ Erro em updateItemStatus:', error);
       return res.status(400).json({
         success: false,
         error: error.message || 'Erro ao atualizar item',
@@ -231,17 +210,10 @@ export class PedidoController {
       const { quantidade, observacoes } = req.body;
       const id_usuario = req.user?.id;
 
-      if (!quantidade || quantidade < 1) {
+      if (!quantidade || quantidade < 1 || !id_usuario) {
         return res.status(400).json({
           success: false,
-          error: 'Quantidade deve ser maior que zero',
-        } as ApiResponse);
-      }
-
-      if (!id_usuario) {
-        return res.status(400).json({
-          success: false,
-          error: 'ID do usuário é obrigatório',
+          error: 'Quantidade válida e ID do usuário são obrigatórios',
         } as ApiResponse);
       }
 
@@ -290,6 +262,37 @@ export class PedidoController {
       return res.status(400).json({
         success: false,
         error: error.message || 'Erro ao deletar item',
+      } as ApiResponse);
+    }
+  }
+
+  async generateReport(req: Request, res: Response) {
+    try {
+      const pedidos = await pedidoService.getAllPedidos({});
+
+      if (!pedidos || pedidos.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Nenhum pedido encontrado para gerar relatório',
+        } as ApiResponse);
+      }
+
+      let csv = 'ID Pedido;Mesa;Status;Data Criacao\n';
+
+      pedidos.forEach((p: any) => {
+        csv += `${p.id};${p.id_mesa};${p.status};${p.created_at}\n`;
+      });
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=relatorio_pedidos.csv');
+
+      return res.status(200).send(csv);
+
+    } catch (error: any) {
+      console.error('❌ Erro em generateReport:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Erro ao gerar arquivo de relatório',
       } as ApiResponse);
     }
   }
